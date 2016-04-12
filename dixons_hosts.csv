@@ -1,0 +1,36 @@
+
+"Device Name","Public IP","Private IP","Start Date",Username,Password
+
+# JumpBox
+dal09infra.euca.com,169.45.156.198,10.143.58.175,"2016-02-26 18:05:09",root,UaXny8Fg
+
+# CLC
+dal09clc01.euca.com,169.45.156.201,10.143.58.180,"2016-03-03 11:47:21",root,DYeLz26n
+
+# AZ1
+dal09cc01.euca.com,169.45.156.200,10.143.58.134,"2016-02-26 19:19:20",root,V9Vs5whS
+dal09nc01.euca.com,,10.143.58.145,"2016-02-26 18:22:30",root,ZbMPUP6p
+dal09nc02.euca.com,,10.143.58.186,"2016-02-26 19:09:27",root,TLV26aCC
+dal09nc03.euca.com,,10.143.58.140,"2016-02-26 19:37:43",root,J2jtbpcQ
+
+# AZ2
+dal09cc02.euca.com,169.45.156.202,10.143.58.174,"2016-02-26 20:20:21",root,KyZDr4cs
+dal09nc04.euca.com,,10.143.58.165,"2016-02-26 19:14:21",root,Wjv28zdz
+dal09nc05.euca.com,,10.143.58.157,"2016-02-26 21:07:10",root,UnMtwVk7
+dal09nc06.euca.com,,10.143.58.147,"2016-02-26 19:13:03",root,ZmA3Mykg
+
+# CEPH Servers
+dal09cephgw01.euca.com,,10.143.58.143,"2016-02-26 20:12:26",root,SlBma4DS
+dal09cephgw02.euca.com,,10.143.58.149,"2016-02-26 18:42:12",root,Yb6pKyTY
+dal09cephmon01.euca.com,,10.143.58.182,"2016-02-26 20:55:18",root,P2ktpQQk
+dal09cephmon02.euca.com,,10.143.58.167,"2016-02-26 19:32:53",root,XsDLf37c
+dal09cephmon03.euca.com,,10.143.58.154,"2016-02-26 19:38:45",root,R4Vp5p8Q
+dal09cephsto01.euca.com,,10.143.58.184,"2016-03-03 13:31:57",root,Q7T29jDB
+dal09cephsto02.euca.com,,10.143.58.137,"2016-03-04 02:25:42",root,Cj6aK4s7
+dal09cephsto03.euca.com,,10.143.58.169,"2016-03-04 02:25:33",root,PknY6aLy
+
+# Unused Ceph Servers
+dal09cephst01OLD.euca.com,10.155.124.146,"2016-02-26 18:31:00",root,H6N8byS7
+dal09cephst02OLD.euca.com,10.155.124.160,"2016-02-26 18:14:27",root,NEGBmb9y
+dal09cephst03OLD.euca.com,10.155.124.188,"2016-02-26 18:11:16",root,TmMq3r3p
+dal09clc-OLD.euca.com,10.155.124.180,"2016-02-26 17:13:02",root,YuEpP7W2

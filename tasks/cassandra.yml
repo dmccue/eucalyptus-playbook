@@ -1,0 +1,25 @@
+# Cassandra installation playbook (requires nsd group)
+
+- block:
+  - set_fact: cassandra_seeds="{{ hostvars[item]['ansible_host'] }}"
+    with_items: "{{ groups['nsd'] }}"
+    register: result
+  - set_fact: cassandra_seeds="{{ result.results | map(attribute='ansible_facts.cassandra_seeds') | list | join(",") }}"
+  - name: Install datastax repo
+    copy: src=templates/repo/datastax.repo dest=/etc/yum.repos.d/datastax.repo
+  - name: Install cassandra
+    yum: name=dsc20
+  - lineinfile: dest=/etc/cassandra/conf/cassandra.yaml regexp=^cluster_name line="cluster_name{{':'}} 'midonet'"
+  - lineinfile: dest=/etc/cassandra/conf/cassandra.yaml regexp=^listen_address line="listen_address{{':'}} {{ inventory_hostname }}"
+  - lineinfile: dest=/etc/cassandra/conf/cassandra.yaml regexp=^rpc_address line="rpc_address{{':'}} {{ inventory_hostname }}"
+  - lineinfile: dest=/etc/cassandra/conf/cassandra.yaml regexp="-.seeds{{':'}}.*" line='          - seeds{{':'}} "{{ cassandra_seeds }}"'
+  - service: name=cassandra state=restarted enabled=yes
+  - wait_for: host="{{ inventory_hostname }}" port=7000
+  - wait_for: host="{{ inventory_hostname }}" port=9042
+  - wait_for: host="{{ inventory_hostname }}" port=9160
+  - action: shell nodetool status | grep ^UN.*{{ ansible_host }}
+    register: result
+    until: result.rc == 0
+    retries: 10
+    delay: 10
+  when: euca_network_mode == "VPCMIDO"

@@ -1,0 +1,20 @@
+- name: Install packages
+  yum: name={{ item }}
+  with_items:
+  - libselinux-python
+  - ntp
+  - http://downloads.eucalyptus.com/software/eucalyptus/4.2/centos/6/x86_64/eucalyptus-release-4.2-1.el6.noarch.rpm
+  - http://downloads.eucalyptus.com/software/euca2ools/3.3/centos/6/x86_64/euca2ools-release-3.3-1.el6.noarch.rpm
+  - http://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+  - tuned
+- name: Enable rhel-6-server-optional-rpms repo
+  shell: subscription-manager repos --enable=rhel-6-server-optional-rpms
+  when: ansible_distribution == 'Red Hat Enterprise Linux'
+- name: Set selinux to permissive
+  selinux: policy=targeted state=permissive
+- name: Start ntp
+  service: name=ntpd state=restarted enabled=yes pattern='/ntpd'
+- name: Create eucalyptus directory
+  file: path=/etc/eucalytpus state=directory
+- name: Copy eucalyptus.conf
+  copy: src=templates/eucalyptus/eucalyptus.conf dest=/etc/eucalyptus/eucalyptus.conf owner=root group=root mode=0644

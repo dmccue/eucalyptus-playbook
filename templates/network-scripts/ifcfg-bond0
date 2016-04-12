@@ -1,0 +1,13 @@
+BOOTPROTO=none
+NM_CONTROLLED=no
+DEVICE=bond0
+NAME=bond0
+ONBOOT=yes
+TYPE=Bond
+BONDING_MASTER=yes
+IPADDR=?.?.?.?
+PREFIX=28
+BONDING_OPTS="mode=4 miimon=100 downdelay=0 updelay=0 lacp_rate=fast xmit_hash_policy=1"
+USERCTL=no
+DNS1=8.8.8.8
+DNS2=8.8.4.4

@@ -1,0 +1,37 @@
+- block:
+  - yum: name={{ item }}
+    with_items:
+    - tomcat
+    - midonet-api
+    - python-midonetclient
+    - eucanetd
+  - copy: src=templates/mido/midonet-api.xml dest=/etc/tomcat/Catalina/localhost/
+  - copy: src=templates/mido/web.xml dest=/usr/share/midonet-api/WEB-INF/
+  - copy: src=templates/mido/server.xml dest=/etc/tomcat/
+  - copy: src=templates/mido/.midonetrc dest=/root/
+  - service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - tomcat
+    - eucanetd
+  - wait_for: port=8080
+  # Mido-api create resources
+  # Create variables
+  - set_fact: midonet_cmd="midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e"
+  - set_fact: mido_tunnelzone_name=mido-tz
+  # Create tunnelzone
+  - shell: "{{ midonet_cmd }} list tunnel-zone name {{ mido_tunnelzone_name }}"
+    ignore_errors: true
+    register: result
+  - shell: "{{ midonet_cmd }} add tunnel-zone name {{ mido_tunnelzone_name }} type gre"
+    when: result|failed
+  # Get tunnelzone id
+  - shell: "{{ midonet_cmd }} list tunnel-zone name {{ mido_tunnelzone_name }} | cut -d' ' -f2"
+    register: result
+  - set_fact: mido_tunnelzone_id={{ result.stdout }}
+  # Get members
+  # - shell: "{{ midonet_cmd }} list tunnel-zone name {{ mido_tunnelzone_name }} member"
+  # Add members
+  - shell: "HOSTID=$({{ midonet_cmd }} list host name {{ item }} | cut -d' ' -f2); {{ midonet_cmd }} list tunnel-zone name {{ mido_tunnelzone_name }} member host $HOSTID | grep $HOSTID || {{ midonet_cmd }} tunnel-zone {{ mido_tunnelzone_id }} add member host $HOSTID address {{ hostvars[item]['ansible_host'] }}"
+    with_items: "{{ groups['midolman'] }}"
+    ignore_errors: true
+  when: euca_network_mode == "VPCMIDO"

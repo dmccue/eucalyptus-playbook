@@ -1,0 +1,14 @@
+[midokura]
+name=Midokura Repository
+baseurl=http://hpedcp:F8tOc2XY@yum.midokura.com/repo/v1.9/stable/RHEL/6/
+gpgkey=http://hpedcp:F8tOc2XY@yum.midokura.com/repo/RPM-GPG-KEY-midokura
+gpgcheck=1
+enabled=1
+
+[midokura-misc]
+name=midokura Misc Package Repo
+baseurl=http://repo.midonet.org/misc/RHEL/6/misc/
+gpgkey=http://repo.midonet.org/RPM-GPG-KEY-midokura
+enabled=1
+gpgcheck=1
+metadata_expire=1

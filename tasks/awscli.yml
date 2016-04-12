@@ -1,0 +1,3 @@
+- yum: name=python-pip state=latest
+- pip: name=awscli
+- file: path=~/.aws mode=0700 state=directory

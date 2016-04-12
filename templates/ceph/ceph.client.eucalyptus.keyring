@@ -1,0 +1,5 @@
+[client.eucalyptus]
+	key = AQAm4eJWju6eHhAAnXjP2VaoZDbh65Ih8WIriA==
+	caps mon = "allow r"
+	caps osd = "allow rwx pool=euca_volumes, allow x"
+

@@ -1,0 +1,22 @@
+# Zookeeper installation playbook (requires nsd group)
+
+- block:
+  - yum: name={{ item }}
+    with_items:
+    - zookeeper
+    - zkdump
+  - lineinfile: dest=/etc/zookeeper/zookeeper-env.sh regexp=^export.JAVA_HOME line='export JAVA_HOME=/usr'
+  - file: path=/var/lib/zookeeper/data state=directory owner=zookeeper group=zookeeper
+  - lineinfile: dest=/etc/zookeeper/zoo.cfg regexp="^server.{{ item.0 + 1 }}" line="server.{{ item.0 + 1 }} {{ item.1 }}:2888:3888"
+    with_indexed_items: "{{ groups['nsd'] }}"
+  - copy: dest=/var/lib/zookeeper/data/myid content="{{ item.0 + 1 }}"
+    with_indexed_items: "{{ groups['nsd'] }}"
+    when: item.1 == "{{ inventory_hostname }}"
+  - service: name=zookeeper state=restarted enabled=yes
+  - wait_for: host="{{ inventory_hostname }}" port=2181
+  - action: shell exec 3<>/dev/tcp/localhost/2181; echo -e ruok >&3; cat <&3 | grep imok
+    register: result
+    until: result.rc == 0
+    retries: 10
+    delay: 10
+  when: euca_network_mode == "VPCMIDO"

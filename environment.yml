@@ -1,0 +1,197 @@
+name: dixonsprod-001
+
+description: Eucalyptus 4.2.1 with MidoNet VPC and CEPH
+
+vars_topology:
+  # Set IPs to private address range
+  - &VAR_CLC_IP
+    10.143.58.180
+  - &VAR_UFS_IP
+    - 10.143.58.134
+    - 10.143.58.174
+  - &VAR_WALRUS_IP
+    10.143.58.180
+  - &VAR_CC_IP_1
+    10.143.58.134
+  - &VAR_CC_IP_2
+    10.143.58.174
+  - &VAR_NC_IPS_1
+    # Space delimited list of Node Controllers
+    10.143.58.145 10.143.58.186 10.143.58.140
+  - &VAR_NC_IPS_2
+    # Space delimited list of Node Controllers
+    10.143.58.165 10.143.58.157 10.143.58.147
+
+
+vars_network:
+  - &VAR_PRIVATE_INTERFACE
+    # Name of private network interface on NCs
+    eth0
+
+vars_network_float:
+  - &VAR_FLOAT_NETWORK
+    # Floating Public IP Address Network CIDR either public or nat'ed private
+    ?/28
+  - &VAR_FLOAT_IPRANGE
+    # Floating Public IP Address range either public or nat'ed private
+    # if /24, start at 3 leaving 2 usable IPs for gateway and midogateway
+    1.2.3.1-1.2.3.10
+
+vars_mido:
+  - &MIDO_REPO_URL
+    http://hpedcp:F8tOc2XY@yum.midokura.com/repo/v1.9/stable/RHEL/6/
+  - &MIDO_API_ADDRESS
+    # The Address/URI for midonet API/requests
+    # Same IP as EUCANETD_HOST / CLC
+    http://10.143.58.180:8080/midonet-api
+  - &MIDO_HOST_MAPPINGS
+    # Mappings for only CLC and NCs
+    # *EUCANETD_HOSTNAME hostname and ip must be present
+      dal09clc01: *VAR_CLC_IP
+      dal09nc01: 10.143.58.145
+      dal09nc02: 10.143.58.186
+      dal09nc03: 10.143.58.140
+      dal09nc04: 10.143.58.165
+      dal09nc05: 10.143.58.157
+      dal09nc06: 10.143.58.147
+  - &MIDO_GATEWAY_HOSTNAME
+    # Must NOT be hostname of CLC
+    - dal09cc01
+    - dal09cc02
+  - &EUCANETD_HOSTNAME
+    # Must be hostname of CLC
+    dal09clc01
+  - &MIDO_ZOOKEEPERS
+    # One of these has to be the EUCANETD_HOST / CLC
+    - *VAR_CLC_IP
+    - *VAR_CC_IP_1
+    - *VAR_CC_IP_2
+  - &MIDO_CASSANDRAS
+    # One of these has to be the EUCANETD_HOST / CLC
+    # - *MIDO_ZOOKEEPERS will run cassandra on each zookeeper host
+    - *MIDO_ZOOKEEPERS
+
+default_attributes:
+  eucalyptus:
+    enterprise-repo: http://downloads.eucalyptus.com/software/eucalyptus/4.2/centos/6Server/x86_64/
+    euca2ools-repo: http://downloads.eucalyptus.com/software/eucalyptus/4.2/centos/6Server/x86_64/
+    eucalyptus-repo: http://downloads.eucalyptus.com/software/eucalyptus/4.2/centos/6Server/x86_64/
+    #init-script-url:
+    #post-script-url:
+    log-level: INFO
+    nc:
+      cache-size: 11000
+      work-size: 160000
+      max-cores: 32
+    set-bind-addr: true
+    bind-interface: *VAR_PRIVATE_INTERFACE
+    network:
+      bridge-interface: br0
+      bridged-nic: *VAR_PRIVATE_INTERFACE
+      private-interface: br0
+      public-interface: br0
+      mode: VPCMIDO
+      config-json:
+        Mode: VPCMIDO
+        PublicIps:
+        - *VAR_FLOAT_IPRANGE
+        InstanceDnsServers:
+        - *VAR_CLC_IP
+        Mido:
+          EucanetdHost: *EUCANETD_HOSTNAME
+          GatewayHost: *MIDO_GATEWAY_HOSTNAME
+          PublicGatewayIP: 192.168.254.1
+          PublicNetworkCidr: 192.168.254.0/30
+          GatewayIP: 192.168.254.2
+          GatewayInterface: gw-mido
+    system-properties:
+      services.imaging.worker.instance_type: m1.medium
+      services.loadbalancing.worker.instance_type: m1.medium
+      objectstorage.providerclient: walrus
+      authentication.access_keys_limit: 20
+      authentication.signing_certificates_limit: 20
+      authentication.credential_download_generate_certificate: Limited
+      cloudformation.region: eucalyptus
+    topology:
+      user-facing: *VAR_UFS_IP
+      clc-1: *VAR_CLC_IP
+      walrus: *VAR_WALRUS_IP
+      clusters:
+       az-01:
+        cc-1: *VAR_CC_IP_1
+        sc-1: *VAR_CC_IP_1
+        storage-backend: overlay
+        nodes: *VAR_NC_IPS_1
+       az-02:
+        cc-1: *VAR_CC_IP_2
+        sc-1: *VAR_CC_IP_2
+        storage-backend: overlay
+        nodes: *VAR_NC_IPS_2
+    yum-options: --nogpg
+  midokura:
+    repo-url: *MIDO_REPO_URL
+    yum-options: --nogpg
+    #bgp-peers:
+    #- local-as: 64512 # Don't change
+    #  remote-as: 36351 # IBM Softlayer
+    #  peer-address: 206.223.118.24 # IBM Softlayer - Dallas
+    #  port-ip: xx.xxx.xxx.xxx
+    #  route: 1.2.3.0/24 # Floating range
+    #  router-name: eucart
+    initial-tenant: euca_tenant_1
+    midonet-api-url: *MIDO_API_ADDRESS
+    cassandras:
+      *MIDO_CASSANDRAS
+    zookeepers:
+      *MIDO_ZOOKEEPERS
+    midolman-host-mapping:
+      *MIDO_HOST_MAPPINGS
+
+
+#  |***** MIDOGATEWAY Setup *****|
+#
+# 1) SSH to mido gateway server (cc/sc)
+#
+# 2) Create a veth pair (gw-host to be on the host side and gw-mido to be connected to midonet)
+#    Same interface as *MIDO_GATEWAY_FLOAT_INTERFACE
+# [root@midogw ~]# ip link add gw-host type veth peer name gw-mido
+# diag: ip link show gw-host; ip link show gw-mido
+#
+# 3) Configure gateway IP on the host side, "*VAR_FLOAT_NETWORK+1/30 broadcast VAR_FLOAT_NETWORK+3 dev gw-host"
+# [root@midogw ~]# ip addr add 159.122.214.145/30 broadcast 159.122.214.147 dev gw-host
+# diag: ip addr show gw-host
+#
+# 4) Bring up gateway interfaces
+# [root@midogw ~]# ip link set gw-host up; ip link set gw-mido up
+# diag: ip link show gw-host; ip link show gw-mido
+#
+# 5) Add the route to FLOAT_NETWORK through midonet gateway IP *VAR_FLOAT_NETWORK+2
+# [root@midogw ~]# route add -net 159.122.214.144/28 gw 159.122.214.146
+# diag: ip route show | grep 192.168.99.2
+# e.g. 192.168.99.0/24 via 192.168.99.2 dev gw-host
+#
+# 6) Reset and recreate midonet resources
+# (on clc)# eucanetd -f; service eucanetd start
+#
+# 7) Test by pinging gateway node
+# [root@midogw ~]# ping -c2 *VAR_FLOAT_NETWORK+2
+#
+# 8) Test by pinging/tcptest an instance public ip
+# [root@midogw ~]# ping -c2 192.168.99.233
+# 64 bytes from 192.168.99.233: icmp_seq=1 ttl=62 time=3.47 ms
+# [root@midogw ~]# nc -z 192.168.99.233 22
+# Connection to 192.168.99.233 22 port [tcp/ssh] succeeded!
+#
+#  |***** CLIENT Setup *****|
+#
+# 1) On another node (e.g. CLC 10.105.10.51):
+# # Add static route to FLOAT_NETWORK via mido gateway private IP
+# [root@clc ~]# route add -net 159.122.214.144/28 gw 10.112.26.245
+# diag: ip route show | grep 10.105.10.70
+# e.g. 192.168.99.0/24 via 10.105.10.70 dev em2
+#
+# 2) Ping/tcptest instance public ip on FLOAT_NETWORK
+# [root@clc ~]# ping -c2 192.168.99.233
+# 64 bytes from 192.168.99.233: icmp_seq=1 ttl=61 time=4.80 ms
+# [root@clc ~]# nc -z 192.168.99.233 22
+# Connection to 192.168.99.233 22 port [tcp/ssh] succeeded!

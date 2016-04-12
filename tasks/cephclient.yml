@@ -1,0 +1,8 @@
+- block:
+  - yum: name=ceph-common
+  - file: path=/etc/ceph state=directory mode=0755
+  - copy: src=templates/ceph/{{ item }} dest=/etc/ceph/{{ item }}
+    with_items:
+    - ceph.conf
+    - ceph.client.eucalyptus.keyring
+  when: euca_storage_mode == "CEPH"

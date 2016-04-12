@@ -1,0 +1,17 @@
+- block:
+  - yum: name={{ item }}
+    with_items:
+    - midolman
+    - iproute-netns
+    - kmod-openvswitch
+#   - https://repos.fedorapeople.org/repos/openstack/EOL/openstack-icehouse/epel-6/iproute-2.6.32-130.el6ost.netns.2.x86_64.rpm
+  - copy: src=templates/mido/midolman.conf dest=/etc/midolman/
+  - set_fact: nsd_hosts="{{ hostvars[item]['ansible_host'] }}"
+    with_items: "{{ groups['nsd'] }}"
+    register: result
+  - set_fact: nsd_hosts="{{ result.results | map(attribute='ansible_facts.nsd_hosts') | list | join(",") }}"
+  - lineinfile: dest=/etc/midolman/midolman.conf regexp="^zookeeper_hosts" line="zookeeper_hosts = {{ nsd_hosts }}"
+  - lineinfile: dest=/etc/midolman/midolman.conf regexp="^servers" line="servers = {{ nsd_hosts }}"
+  - service: name=midolman state=restarted enabled=yes
+  - wait_for: host="{{ inventory_hostname }}" port=7200
+  when: euca_network_mode == "VPCMIDO"

@@ -1,0 +1,4 @@
+[rhel6]
+name=rhel67
+baseurl=http://10.143.58.175/sw/6.7/os/x86_64/
+gpgcheck=0

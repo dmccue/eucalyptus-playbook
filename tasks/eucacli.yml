@@ -1,0 +1,9 @@
+- yum: name=euca2ools state=latest
+- file: path=~/.euca mode=0700 state=directory
+- stat: path=~/.euca/eucalyptus.ini
+  ignore_errors: true
+  register: result
+- shell: eval $(euare-releaserole); source ~/sysrc; euare-usercreate -wld {{ dns_domain }} eucalyptus > ~/.euca/eucalyptus.ini
+  when: not result.stat.exists is defined or not result.stat.exists
+- lineinfile: dest=~/.bash_profile regexp=^export.AWS_DEFAULT_REGION line="export AWS_DEFAULT_REGION=localhost"
+# eval $(euare-assumerole AccountAdministrator)
