@@ -113,6 +113,8 @@
       az-2.storage.cephvolumepools: "{{ ceph_backend_volumepools }}"
       az-2.storage.cephsnapshotpools: "{{ ceph_backend_snapshotpools }}"
       storage.global_total_snapshot_size_limit_gb: 200
+  environment:
+    AWS_DEFAULT_REGION: localhost
   tasks:
   - yum: name={{ item }}
     with_items:
@@ -147,7 +149,7 @@
   - include: tasks/eucacli.yml
   # Networking config
   - copy: src=templates/mido/network.json dest=~/network.json
-  - shell: source ~/.bash_profile && euctl cloud.network.network_configuration=@network.json
+  - shell: euctl cloud.network.network_configuration=@network.json
   - service: name=eucanetd state=stopped enabled=yes
   - shell: eucanetd -f || true
   - shell: eucanetd -F || true
