@@ -257,7 +257,6 @@
   - include: tasks/cephclient.yml
 
 
-#subscription-manager register --force --auto-attach --username=robin@connectedworldservices.com --password=4437rvXC698%GFb
 # midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e list tunnel-zone | grep 'name.mido-tz ' || \
 # midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e add tunnel-zone name mido-tz type gre
 # Get TZ - midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e list tunnel-zone name mido-tz
