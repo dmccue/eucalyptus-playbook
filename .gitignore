@@ -1,3 +1,4 @@
 templates/keys
 hosts
+start.sh
 test.yml
