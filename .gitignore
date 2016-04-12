@@ -1,5 +1,6 @@
 templates/keys
 hosts
+*.csv
 start.sh
 test.yml
 environment.yml
