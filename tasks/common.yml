@@ -1,3 +1,7 @@
+- name: Copy hosts file
+  copy: src=templates/hosts_file dest=/etc/hosts owner=root group=root mode=0644
+- name: Set hostname
+  hostname: name={{ inventory_hostname }}
 - name: Install packages
   yum: name={{ item }}
   with_items:
@@ -10,6 +14,12 @@
 - name: Enable rhel-6-server-optional-rpms repo
   shell: subscription-manager repos --enable=rhel-6-server-optional-rpms
   when: ansible_distribution == 'Red Hat Enterprise Linux'
+- name: Install midokura repo
+  copy: src=templates/repo/midokura.repo dest=/etc/yum.repos.d/midokura.repo
+  register: repo_added
+- name: Update packages
+  yum: name=* state=latest
+  when: repo_added|changed
 - name: Set selinux to permissive
   selinux: policy=targeted state=permissive
 - name: Start ntp
@@ -18,3 +28,53 @@
   file: path=/etc/eucalytpus state=directory
 - name: Copy eucalyptus.conf
   copy: src=templates/eucalyptus/eucalyptus.conf dest=/etc/eucalyptus/eucalyptus.conf owner=root group=root mode=0644
+###########################
+# Set INTERNAL networking
+###########################
+- block:
+  # Set eth0 config file
+  - copy: src=templates/network-scripts/ifcfg-eth0 dest=/etc/sysconfig/network-scripts
+  - lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^IPADDR= line="IPADDR={{ ansible_host }}"
+  when: "'nc' not in group_names"
+- block:
+  # Set bridge config file on NCs
+  - copy: src=templates/network-scripts/ifcfg-eth0-br dest=/etc/sysconfig/network-scripts/ifcfg-eth0
+  - copy: src=templates/network-scripts/ifcfg-br0 dest=/etc/sysconfig/network-scripts/
+  - lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-br0 regexp=^IPADDR= line="IPADDR={{ ansible_host }}"
+  when: "'nc' in group_names"
+###########################
+# Set EXTERNAL networking
+###########################
+- block:
+  - name: Networking - External - load modules
+    modprobe: name=bonding
+  - name: Networking - External - Create iptables firewall rules
+    copy: src=templates/iptables_ext dest=/etc/sysconfig/iptables
+  - name: Networking - External - Copy sysconfig ifcfg files
+    copy: src=templates/network-scripts/{{ item }} dest=/etc/sysconfig/network-scripts
+    with_items:
+      - ifcfg-eth1
+      - ifcfg-eth3
+      - ifcfg-bond0
+  - name: Networking - External - Modify IPADDR
+    lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-bond0 regexp=^IPADDR line=IPADDR={{ ext }}
+  - name: Networking - External - Set gateway - bond0
+    lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-bond0 regexp=^GATEWAY line="GATEWAY=169.45.156.193"
+  - name: Networking - External - Remove gateway - eth0
+    lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^GATEWAY line=""
+when: ext is defined
+- name: Networking - Find ifcfg files
+  find: paths="/etc/sysconfig/network-scripts" patterns="ifcfg-*"
+  register: result
+- name: Networking - Disable NetworkManager on all interfaces
+  lineinfile: dest={{ item.path }} regexp=^NM_CONTROLLED line="NM_CONTROLLED=no"
+  with_items: "{{ result.files }}"
+- name: Networking - Internal - Create internal iptables firewall rules
+  copy: src=templates/iptables_int dest=/etc/sysconfig/iptables
+  when: ext is not defined
+- name: Reload firewall rules from file
+  shell: iptables-restore < /etc/sysconfig/iptables
+- name: Restart iptables
+  service: name=iptables state=restarted enabled=yes
+- name: Restart networking
+  service: name=network state=restarted enabled=yes

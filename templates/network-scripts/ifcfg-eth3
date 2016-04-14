@@ -1,6 +1,6 @@
+NAME=eth3
+DEVICE=eth3
 NM_CONTROLLED=no
-NAME="eth3"
-DEVICE="eth3"
 ONBOOT=yes
 BOOTPROTO=none
 TYPE=Ethernet

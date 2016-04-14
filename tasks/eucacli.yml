@@ -2,8 +2,13 @@
 - file: path=~/.euca mode=0700 state=directory
 - stat: path=~/.euca/eucalyptus.ini
   ignore_errors: true
+  register: result_ini
+- action: shell eval $(euare-releaserole); source ~/sysrc; euare-usercreate -wld {{ dns_domain }} eucalyptus > ~/.euca/eucalyptus.ini
   register: result
-- shell: eval $(euare-releaserole); source ~/sysrc; euare-usercreate -wld {{ dns_domain }} eucalyptus > ~/.euca/eucalyptus.ini
-  when: not result.stat.exists is defined or not result.stat.exists
-- lineinfile: dest=~/.bash_profile regexp=^export.AWS_DEFAULT_REGION line="export AWS_DEFAULT_REGION=localhost"
+  until: result.rc == 0
+  retries: 10
+  delay: 5
+  when: not result_ini.stat.exists is defined or not result_ini.stat.exists
+- lineinfile: dest=~/.euca/eucalyptus.ini regexp="^\[region .*]" line="[region {{ dns_domain }}]"
+- lineinfile: dest=~/.bash_profile regexp=^export.AWS_DEFAULT_REGION line="export AWS_DEFAULT_REGION={{ dns_domain }}"
 # eval $(euare-assumerole AccountAdministrator)

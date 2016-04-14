@@ -1,54 +1,12 @@
 ---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+  - file: name=~/.ssh/mux-* state=absent
+
 - hosts: all:!bastion:!ceph
   tasks:
   - include: tasks/common.yml
-  - name: Install midokura repo
-    copy: src=templates/repo/midokura.repo dest=/etc/yum.repos.d/midokura.repo
-    register: repo_added
-  - name: Copy hosts file
-    copy: src=templates/hosts_file dest=/etc/hosts owner=root group=root mode=0644
-  - name: Set hostname
-    hostname: name={{ inventory_hostname }}
-  - name: Networking - Copy ifcfg-eth0
-    copy: src=templates/network-scripts/ifcfg-eth0 dest=/etc/sysconfig/network-scripts
-  - name: Networking - ifcfg-eth0 set IPADDR
-    lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^IPADDR line="IPADDR={{ ansible_host }}"
-  - block:
-    - name: Networking - External - load modules
-      modprobe: name=bonding
-    - name: Networking - External - Create iptables firewall rules
-      copy: src=templates/iptables_ext dest=/etc/sysconfig/iptables
-    - name: Networking - External - Copy sysconfig ifcfg files
-      copy: src=templates/network-scripts/{{ item }} dest=/etc/sysconfig/network-scripts
-      with_items:
-        - ifcfg-eth1
-        - ifcfg-eth3
-        - ifcfg-bond0
-    - name: Networking - External - Modify IPADDR
-      lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-bond0 regexp=^IPADDR line=IPADDR={{ ext }}
-    - name: Networking - External - Set gateway - bond0
-      lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-bond0 regexp=^GATEWAY line="GATEWAY=169.45.156.193"
-    - name: Networking - External - Remove gateway - eth0
-      lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^GATEWAY line=""
-    when: ext is defined
-  - name: Networking - Find ifcfg files
-    find: paths="/etc/sysconfig/network-scripts" patterns="ifcfg-*"
-    register: result
-  - name: Networking - Disable NetworkManager on all interfaces
-    lineinfile: dest={{ item.path }} regexp=^NM_CONTROLLED line="NM_CONTROLLED=no"
-    with_items: "{{ result.files }}"
-  - name: Networking - Internal - Create internal iptables firewall rules
-    copy: src=templates/iptables_int dest=/etc/sysconfig/iptables
-    when: ext is not defined
-  - name: Reload firewall rules from file
-    shell: iptables-restore < /etc/sysconfig/iptables
-  - name: Restart iptables
-    service: name=iptables state=restarted enabled=yes
-  - name: Restart networking
-    service: name=network state=restarted enabled=yes
-  - name: Update packages
-    yum: name=* state=latest
-    when: repo_added|changed
 
 
 - hosts: clc:ufs
@@ -114,7 +72,7 @@
       az-2.storage.cephsnapshotpools: "{{ ceph_backend_snapshotpools }}"
       storage.global_total_snapshot_size_limit_gb: 200
   environment:
-    AWS_DEFAULT_REGION: localhost
+    AWS_DEFAULT_REGION: "{{ dns_domain }}"
   tasks:
   - yum: name={{ item }}
     with_items:
@@ -133,12 +91,12 @@
     register: result
     until: result.rc == 0
     retries: 10
-    delay: 10
+    delay: 5
   - action: shell source /root/sysrc && euserv-describe-services "{{ ansible_host }}" | grep bootstrap.*enabled
     register: result
     until: result.rc == 0
     retries: 10
-    delay: 10
+    delay: 5
   - name: Set euctl properties
     shell: source /root/sysrc; euctl "{{ item }}={{ euctl_set[item] }}"
     with_items: "{{ euctl_set.keys() }}"
@@ -158,11 +116,13 @@
 
 - hosts: ufs
   tasks:
-  - yum: name={{ item }}
+  - name: Install packages
+    yum: name={{ item }}
     with_items:
     - eucaconsole
     - nginx
-  - copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
+  - name: Copy eucalyptus keys
+    copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
     with_items:
     - cloud-cert.pem
     - cloud-pk.pem
@@ -172,9 +132,11 @@
     with_items:
     - eucalyptus-cloud
     - eucaconsole
-  - wait_for: port=8888
-  - wait_for: port=80
-  - wait_for: port=443
+  - wait_for: port={{ item }}
+    with_items:
+    - 8888
+    - 80
+    - 443
 
 
 - hosts: cc:sc
@@ -233,12 +195,13 @@
       net.ipv4.ip_forward: 1
       net.bridge.bridge-nf-call-iptables: 1
   tasks:
-  - sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
+  - name: Set sysctl settings
+    sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
     with_items: "{{ sysctl_set.keys() }}"
+  - name: Ensure hostname is resolvable
+    shell: ping -c1 $(hostname --fqdn)
   - name: Install eucalyptus-nc
     yum: name=eucalyptus-nc
-  - name: Delete virtual network interface
-    shell: virsh net-destroy default; virsh net-autostart default --disable
   - name: Load bridge module
     modprobe: name=bridge
   - shell: tuned-adm profile virtual-host
@@ -252,8 +215,15 @@
     when: azone is defined
   - service: name={{ item }} state=restarted enabled=yes
     with_items:
+    - libvirtd
     - messagebus
-    - eucalyptus-nc
+  - service: name=eucalyptus-nc state=restarted enabled=yes
+    when: ansible_distribution_version < "7"
+  - service: name=eucalyptus-node state=restarted enabled=yes
+    when: ansible_distribution_version >= "7"
+  - name: Delete virtual network interface
+    shell: virsh net-destroy default; virsh net-autostart default --disable
+    ignore_errors: true
   - wait_for: port=8775
   # Ceph Client
   - include: tasks/cephclient.yml
@@ -266,4 +236,38 @@
 # Get Hosts - midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e host list
 # Add host to TZ -midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e tunnel-zone 4d1fd56a-ddd9-4adc-8c7b-b1317bf38340 add member host 76555c97-3094-4381-964e-b25ba0ebb83a address 10.143.58.145
 # euca-create-vpc 192.168.0.0/16 --tenancy default
-# esi-manage-stack -a create imaging
+# source ~/.sysrc; esi-manage-stack -a create imaging
+
+
+
+
+
+
+
+############################
+# Node controller chef recipe
+############################
+# network_script_directory = '/etc/sysconfig/network-scripts'
+# bridged_nic = node["eucalyptus"]["network"]["bridged-nic"]
+# bridge_interface = node["eucalyptus"]["network"]["bridge-interface"]
+# bridged_nic_file = "#{network_script_directory}/ifcfg-" + bridged_nic
+# bridge_file = "#{network_script_directory}/ifcfg-" + bridge_interface
+# bridged_nic_hwaddr = `cat #{bridged_nic_file} | grep HWADDR`.strip
+#
+# template bridge_file do
+#   source "ifcfg-br-dhcp.erb"
+#   mode 0644
+#   owner "root"
+#   group "root"
+# end
+#
+# execute "Set HWADDR in bridged nic file" do
+#   command "echo #{bridged_nic_hwaddr} >> #{bridged_nic_file}"
+#   not_if "grep '#{bridged_nic_hwaddr}' #{bridged_nic_file}"
+# end
+#
+#
+# ## Setup bridge to allow instances to dhcp properly and early on
+# execute "brctl setfd #{node["eucalyptus"]["network"]["bridge-interface"]} 2"
+# execute "brctl sethello #{node["eucalyptus"]["network"]["bridge-interface"]} 2"
+# execute "brctl stp #{node["eucalyptus"]["network"]["bridge-interface"]} off"
