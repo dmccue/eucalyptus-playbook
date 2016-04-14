@@ -1,4 +1,3 @@
-NAME=br0
 DEVICE=br0
 BOOTPROTO=none
 ONBOOT=yes

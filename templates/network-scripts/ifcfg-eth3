@@ -1,4 +1,3 @@
-NAME=eth3
 DEVICE=eth3
 NM_CONTROLLED=no
 ONBOOT=yes

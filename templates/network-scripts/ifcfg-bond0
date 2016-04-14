@@ -1,4 +1,3 @@
-NAME=bond0
 DEVICE=bond0
 BOOTPROTO=none
 NM_CONTROLLED=no

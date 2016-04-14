@@ -1,4 +1,3 @@
-NAME=eth0
 DEVICE=eth0
 BOOTPROTO=none
 ONBOOT=yes
