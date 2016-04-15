@@ -1,4 +1,0 @@
-DEVICE=eth0
-TYPE=Ethernet
-BRIDGE=br0
-NOZEROCONF=true

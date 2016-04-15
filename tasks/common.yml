@@ -7,10 +7,10 @@
   with_items:
   - libselinux-python
   - ntp
+  - tuned
   - http://downloads.eucalyptus.com/software/eucalyptus/4.2/centos/6/x86_64/eucalyptus-release-4.2-1.el6.noarch.rpm
   - http://downloads.eucalyptus.com/software/euca2ools/3.3/centos/6/x86_64/euca2ools-release-3.3-1.el6.noarch.rpm
   - http://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
-  - tuned
 - name: Enable rhel-6-server-optional-rpms repo
   shell: subscription-manager repos --enable=rhel-6-server-optional-rpms
   when: ansible_distribution == 'Red Hat Enterprise Linux'
@@ -27,21 +27,21 @@
 - name: Create eucalyptus directory
   file: path=/etc/eucalytpus state=directory
 - name: Copy eucalyptus.conf
-  copy: src=templates/eucalyptus/eucalyptus.conf dest=/etc/eucalyptus/eucalyptus.conf owner=root group=root mode=0644
+  template: src=templates/eucalyptus/eucalyptus.conf.j2 dest=/etc/eucalyptus/eucalyptus.conf owner=root group=root mode=0644
+
+#- file: path=/etc/sysconfig/network-scripts/ifcfg-* state=absent
 ###########################
 # Set INTERNAL networking
 ###########################
+- template: src=templates/network-scripts/ifcfg-lo.j2 dest=/etc/sysconfig/network-scripts/ifcfg-lo
+- template: src=templates/network-scripts/ifcfg-eth.j2 dest=/etc/sysconfig/network-scripts/ifcfg-eth0
+
 - block:
-  # Set eth0 config file
-  - copy: src=templates/network-scripts/ifcfg-eth0 dest=/etc/sysconfig/network-scripts
-  - lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^IPADDR= line="IPADDR={{ ansible_host }}"
-  when: "'nc' not in group_names"
-- block:
-  # Set bridge config file on NCs
-  - copy: src=templates/network-scripts/ifcfg-eth0-br dest=/etc/sysconfig/network-scripts/ifcfg-eth0
-  - copy: src=templates/network-scripts/ifcfg-br0 dest=/etc/sysconfig/network-scripts/
-  - lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-br0 regexp=^IPADDR= line="IPADDR={{ ansible_host }}"
+  # Set internal bridge config file on NCs
+  - template: src=templates/network-scripts/ifcfg-br.j2 dest=/etc/sysconfig/network-scripts/ifcfg-br0
+  - shell: brctl setfd br0 2 && brctl sethello br0 2 && brctl stp br0 off
   when: "'nc' in group_names"
+
 ###########################
 # Set EXTERNAL networking
 ###########################
@@ -51,24 +51,23 @@
   - name: Networking - External - Create iptables firewall rules
     copy: src=templates/iptables_ext dest=/etc/sysconfig/iptables
   - name: Networking - External - Copy sysconfig ifcfg files
-    copy: src=templates/network-scripts/{{ item }} dest=/etc/sysconfig/network-scripts
-    with_items:
-      - ifcfg-eth1
-      - ifcfg-eth3
-      - ifcfg-bond0
-  - name: Networking - External - Modify IPADDR
-    lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-bond0 regexp=^IPADDR line=IPADDR={{ ext }}
-  - name: Networking - External - Set gateway - bond0
-    lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-bond0 regexp=^GATEWAY line="GATEWAY=169.45.156.193"
-  - name: Networking - External - Remove gateway - eth0
+    template: src=templates/network-scripts/ifcfg-bond.j2 dest=/etc/sysconfig/network-scripts/ifcfg-bond0
+  - name: Networking - External - Set bonded slave interfaces
+    template: src=templates/network-scripts/ifcfg-eth.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ item }}
+    with_items: "{{ ext_bond_slaves }}"
+  - name: Networking - External - Remove internal gateway if ext - eth0
     lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^GATEWAY line=""
-when: ext is defined
-- name: Networking - Find ifcfg files
-  find: paths="/etc/sysconfig/network-scripts" patterns="ifcfg-*"
-  register: result
-- name: Networking - Disable NetworkManager on all interfaces
-  lineinfile: dest={{ item.path }} regexp=^NM_CONTROLLED line="NM_CONTROLLED=no"
-  with_items: "{{ result.files }}"
+  when: ext is defined
+
+###########################
+# Other
+###########################
+# - name: Networking - Find ifcfg files
+#   find: paths="/etc/sysconfig/network-scripts" patterns="ifcfg-*"
+#   register: result
+# - name: Networking - Disable NetworkManager on all interfaces
+#   lineinfile: dest={{ item.path }} regexp=^NM_CONTROLLED line="NM_CONTROLLED=no"
+#   with_items: "{{ result.files }}"
 - name: Networking - Internal - Create internal iptables firewall rules
   copy: src=templates/iptables_int dest=/etc/sysconfig/iptables
   when: ext is not defined

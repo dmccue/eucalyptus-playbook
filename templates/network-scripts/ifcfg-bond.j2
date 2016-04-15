@@ -4,7 +4,8 @@ NM_CONTROLLED=no
 ONBOOT=yes
 TYPE=Bond
 BONDING_MASTER=yes
-IPADDR=?.?.?.?
+IPADDR={{ ext }}
+GATEWAY=169.45.156.193
 PREFIX=28
 BONDING_OPTS="mode=4 miimon=100 downdelay=0 updelay=0 lacp_rate=fast xmit_hash_policy=1"
 USERCTL=no

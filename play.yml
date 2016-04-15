@@ -127,14 +127,18 @@
     - cloud-cert.pem
     - cloud-pk.pem
     - euca.p12
+  - lineinfile: dest=/etc/eucaconsole/console.ini regexp='^host.*=' line="host = {{ ansible_host }}"
+  - lineinfile: dest=/etc/eucaconsole/nginx.conf regexp=proxy_pass.http line="proxy_pass http://{{ ansible_host }}:8888;"
   - name: Start services
     service: name={{ item }} state=restarted enabled=yes
     with_items:
     - eucalyptus-cloud
     - eucaconsole
-  - wait_for: port={{ item }}
+  - wait_for: host={{ ansible_host }} port={{ item }}
     with_items:
     - 8888
+  - wait_for: host={{ ext }} port={{ item }}
+    with_items:
     - 80
     - 443
 
@@ -237,37 +241,3 @@
 # Add host to TZ -midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e tunnel-zone 4d1fd56a-ddd9-4adc-8c7b-b1317bf38340 add member host 76555c97-3094-4381-964e-b25ba0ebb83a address 10.143.58.145
 # euca-create-vpc 192.168.0.0/16 --tenancy default
 # source ~/.sysrc; esi-manage-stack -a create imaging
-
-
-
-
-
-
-
-############################
-# Node controller chef recipe
-############################
-# network_script_directory = '/etc/sysconfig/network-scripts'
-# bridged_nic = node["eucalyptus"]["network"]["bridged-nic"]
-# bridge_interface = node["eucalyptus"]["network"]["bridge-interface"]
-# bridged_nic_file = "#{network_script_directory}/ifcfg-" + bridged_nic
-# bridge_file = "#{network_script_directory}/ifcfg-" + bridge_interface
-# bridged_nic_hwaddr = `cat #{bridged_nic_file} | grep HWADDR`.strip
-#
-# template bridge_file do
-#   source "ifcfg-br-dhcp.erb"
-#   mode 0644
-#   owner "root"
-#   group "root"
-# end
-#
-# execute "Set HWADDR in bridged nic file" do
-#   command "echo #{bridged_nic_hwaddr} >> #{bridged_nic_file}"
-#   not_if "grep '#{bridged_nic_hwaddr}' #{bridged_nic_file}"
-# end
-#
-#
-# ## Setup bridge to allow instances to dhcp properly and early on
-# execute "brctl setfd #{node["eucalyptus"]["network"]["bridge-interface"]} 2"
-# execute "brctl sethello #{node["eucalyptus"]["network"]["bridge-interface"]} 2"
-# execute "brctl stp #{node["eucalyptus"]["network"]["bridge-interface"]} off"
