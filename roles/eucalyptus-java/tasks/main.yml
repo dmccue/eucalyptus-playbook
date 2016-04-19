@@ -1,0 +1,7 @@
+- name: Set sysctl settings
+  sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
+  with_items: "{{ sysctl_set.keys() }}"
+- name: Install eucalyptus-cloud
+  yum: name=eucalyptus-cloud
+# - name: Configure eucalyptus.conf cloud_opts
+#   lineinfile: dest=/etc/eucalyptus/eucalyptus.conf regexp=^CLOUD_OPTS line=CLOUD_OPTS="{{ cloud_opts }}"

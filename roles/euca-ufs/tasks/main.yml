@@ -1,0 +1,39 @@
+- name: Install packages
+  yum: name={{ item }}
+  with_items:
+  - eucaconsole
+  - nginx
+- name: Stop nginx
+  service: name=nginx state=stopped enabled=no
+- name: Copy eucalyptus keys
+  copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
+  with_items:
+  - cloud-cert.pem
+  - cloud-pk.pem
+  - euca.p12
+- name: Change eucaconsole ufs endpoint
+  lineinfile: dest=/etc/eucaconsole/console.ini regexp='^host[\t ]*=' line="host = localhost"
+- name: Change nginx to use internal backend
+  lineinfile: dest=/etc/eucaconsole/nginx.conf regexp='^[\t ]*proxy_pass[\t ]+http' line="            proxy_pass http://localhost:8888;"
+# - name: Create nginx loadbalance backend
+#   blockinfile:
+#     dest: /etc/eucaconsole/nginx.conf
+#     content: "upstream backend {
+#       least_conn;
+#       server dal09cc01;
+#       server dal09cc02;
+#     }"
+- name: Start services
+  service: name={{ item }} state=restarted enabled=yes
+  with_items:
+  - eucalyptus-cloud
+  - eucaconsole
+- name: Wait for eucaconsole backend to start
+  wait_for: port={{ item }}
+  with_items:
+  - 8888
+- name: Wait for nginx frontend to start
+  wait_for: host={{ ext }} port={{ item }}
+  with_items:
+  - 80
+  - 443

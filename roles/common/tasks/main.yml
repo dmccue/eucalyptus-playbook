@@ -11,12 +11,12 @@
   - http://downloads.eucalyptus.com/software/eucalyptus/4.2/centos/6/x86_64/eucalyptus-release-4.2-1.el6.noarch.rpm
   - http://downloads.eucalyptus.com/software/euca2ools/3.3/centos/6/x86_64/euca2ools-release-3.3-1.el6.noarch.rpm
   - http://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+  register: repo_added
 - name: Enable rhel-6-server-optional-rpms repo
   shell: subscription-manager repos --enable=rhel-6-server-optional-rpms
   when: ansible_distribution == 'Red Hat Enterprise Linux'
 - name: Install midokura repo
   copy: src=templates/repo/midokura.repo dest=/etc/yum.repos.d/midokura.repo
-  register: repo_added
 - name: Update packages
   yum: name=* state=latest
   when: repo_added|changed
@@ -55,8 +55,8 @@
   - name: Networking - External - Set bonded slave interfaces
     template: src=templates/network-scripts/ifcfg-eth.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ item }}
     with_items: "{{ ext_bond_slaves }}"
-  - name: Networking - External - Remove internal gateway if ext - eth0
-    lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^GATEWAY line=""
+  # - name: Networking - External - Remove internal gateway if ext - eth0
+  #   lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^GATEWAY line=""
   when: ext is defined
 
 ###########################

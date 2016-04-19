@@ -1,0 +1,37 @@
+- yum: name={{ item }}
+  with_items:
+  - unzip
+- stat: path=/var/lib/eucalyptus/db/data/PG_VERSION
+  register: result
+- service: name=eucalyptus-cloud state=stopped
+  when: not result.stat.exists
+- shell: clcadmin-initialize-cloud
+  when: not result.stat.exists
+- service: name=eucalyptus-cloud state=restarted enabled=yes
+- wait_for: port=8443
+- wait_for: port=8773
+- synchronize: mode=pull src=/var/lib/eucalyptus/keys/* dest=templates/keys/ checksum=yes recursive=yes
+  tags: always
+- action: shell clcadmin-assume-system-credentials > /root/sysrc && echo "export AWS_DEFAULT_REGION=localhost" >> /root/sysrc
+  register: result
+  until: result.rc == 0
+  retries: 10
+  delay: 5
+- action: shell source /root/sysrc && euserv-describe-services --filter="service-type=user-api" | grep 'enabled *$'
+  register: result
+  until: result.rc == 0
+  retries: 10
+  delay: 10
+- name: Set euctl properties
+  shell: source /root/sysrc; euctl "{{ item }}={{ euctl_set[item] }}"
+  with_items: "{{ euctl_set.keys() }}"
+# Post-installation
+- include: ../../../tasks/awscli.yml
+- include: ../../../tasks/eucacli.yml
+# Networking config
+- copy: src=templates/mido/network.json dest=~/network.json
+- shell: euctl cloud.network.network_configuration=@network.json
+- service: name=eucanetd state=stopped enabled=yes
+- shell: eucanetd -f || true
+- shell: eucanetd -F || true
+- service: name=eucanetd state=restarted enabled=yes

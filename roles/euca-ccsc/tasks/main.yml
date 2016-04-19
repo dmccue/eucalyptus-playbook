@@ -1,0 +1,41 @@
+- sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
+  with_items: "{{ sysctl_set.keys() }}"
+- name: Install cc/sc
+  yum: name={{ item }}
+  with_items:
+  - eucalyptus-sc
+  - eucalyptus-cc
+- block:
+  - name: Convert azone to host list
+    set_fact: result="[]"
+  - set_fact: result="{{ result }} + {{ groups[item] }}"
+    with_items: "{{ azone.split(',') }}"
+  - name: Convert host list to IP list
+    set_fact: cc_nodes="[]"
+  - set_fact: cc_nodes="{{ cc_nodes }} + [ '{{ hostvars[item]['ansible_host'] }}' ]"
+    with_items: "{{ result }}"
+  - set_fact: cc_nodes="{{ cc_nodes | join(' ') }}"
+- name: Configure eucalyptus.conf nodes
+  lineinfile: dest=/etc/eucalyptus/eucalyptus.conf regexp=^NODES line=NODES="{{ cc_nodes }}"
+  when: cc_nodes is defined
+- copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
+  with_items:
+  - cloud-cert.pem
+  - cloud-pk.pem
+  - euca.p12
+- copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
+  with_items:
+  - "{{ azone }}/cluster-cert.pem"
+  - "{{ azone }}/cluster-pk.pem"
+  - "{{ azone }}/node-cert.pem"
+  - "{{ azone }}/node-pk.pem"
+  ignore_errors: yes
+  when: azone is defined
+- service: name={{ item }} state=restarted enabled=yes
+  with_items:
+  - eucalyptus-cloud
+  - eucalyptus-cc
+- shell: clusteradmin-register-nodes {{ cc_nodes }}
+- wait_for: port=8773 # sc
+- wait_for: port=8774 # cc
+- shell: ip link add gw-host type veth peer name gw-mido || true

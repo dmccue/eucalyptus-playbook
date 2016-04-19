@@ -4,14 +4,15 @@
   tasks:
   - file: name=~/.ssh/mux-* state=absent
 
-- hosts: all:!bastion:!ceph
-  tasks:
-  - include: tasks/common.yml
+
+- hosts: clc:cc:sc:ufs:nc
+  roles: [common]
+  tags: common
 
 
-- hosts: clc:ufs
+- hosts: clc:ufs:sc
+  gather_facts: false
   vars:
-    cloud_opts: "--bind-addr={{ ansible_host }} -Xmx32G -Xms32G -XX:ReservedCodeCacheSize=512M -XX:+MaxFDLimit -XX:+UseThreadPriorities -XX:+UseCompressedOops -XX:+UseStringCache -XX:+AggressiveOpts"
     sysctl_set:
       net.ipv4.neigh.default.gc_interval: 3600
       net.ipv4.neigh.default.gc_stale_time: 3600
@@ -19,31 +20,11 @@
       net.ipv4.neigh.default.gc_thresh2: 2048
       net.ipv4.neigh.default.gc_thresh3: 4096
       net.ipv4.ip_forward: 1
-  tasks:
-  - name: Set sysctl settings
-    sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
-    with_items: "{{ sysctl_set.keys() }}"
-  - name: Install eucalyptus-cloud
-    yum: name=eucalyptus-cloud
-  - name: Configure eucalyptus.conf cloud_opts
-    lineinfile: dest=/etc/eucalyptus/eucalyptus.conf regexp=^CLOUD_OPTS line=CLOUD_OPTS="{{ cloud_opts }}"
-
-
-- hosts: clc:cc
-  tasks:
-  # Zookeeper
-  - include: tasks/zookeeper.yml
-  # Cassandra
-  - include: tasks/cassandra.yml
-
-
-- hosts: midolman
-  tasks:
-  # Midolman
-  - include: tasks/midolman.yml
+  roles: [eucalyptus-java]
 
 
 - hosts: clc
+  gather_facts: false
   vars:
     euctl_set:
       authentication.access_keys_limit: 20
@@ -73,164 +54,57 @@
       storage.global_total_snapshot_size_limit_gb: 200
   environment:
     AWS_DEFAULT_REGION: "{{ dns_domain }}"
-  tasks:
-  - yum: name={{ item }}
-    with_items:
-    - unzip
-  - stat: path=/var/lib/eucalyptus/db/data/PG_VERSION
-    register: result
-  - service: name=eucalyptus-cloud state=stopped
-    when: not result.stat.exists
-  - shell: clcadmin-initialize-cloud
-    when: not result.stat.exists
-  - service: name=eucalyptus-cloud state=restarted enabled=yes
-  - wait_for: port=8443
-  - wait_for: port=8773
-  - synchronize: mode=pull src=/var/lib/eucalyptus/keys/* dest=templates/keys/ checksum=yes recursive=yes
-  - action: shell clcadmin-assume-system-credentials > /root/sysrc && echo "export AWS_DEFAULT_REGION=localhost" >> /root/sysrc
-    register: result
-    until: result.rc == 0
-    retries: 10
-    delay: 5
-  - action: shell source /root/sysrc && euserv-describe-services "{{ ansible_host }}" | grep bootstrap.*enabled
-    register: result
-    until: result.rc == 0
-    retries: 10
-    delay: 5
-  - name: Set euctl properties
-    shell: source /root/sysrc; euctl "{{ item }}={{ euctl_set[item] }}"
-    with_items: "{{ euctl_set.keys() }}"
-  # MidoAPI
-  - include: tasks/midoapi.yml
-  # Post-installation
-  - include: tasks/awscli.yml
-  - include: tasks/eucacli.yml
-  # Networking config
-  - copy: src=templates/mido/network.json dest=~/network.json
-  - shell: euctl cloud.network.network_configuration=@network.json
-  - service: name=eucanetd state=stopped enabled=yes
-  - shell: eucanetd -f || true
-  - shell: eucanetd -F || true
-  - service: name=eucanetd state=restarted enabled=yes
+  roles:
+  - euca-clc
+  - midoapi
+  tags: clc
+
+- hosts: nsd
+  gather_facts: false
+  roles:
+  - zookeeper
+  - cassandra
+  tags: nsd
+
+
+- hosts: cc:nc
+  gather_facts: false
+  roles: [midolman]
 
 
 - hosts: ufs
-  tasks:
-  - name: Install packages
-    yum: name={{ item }}
-    with_items:
-    - eucaconsole
-    - nginx
-  - name: Copy eucalyptus keys
-    copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
-    with_items:
-    - cloud-cert.pem
-    - cloud-pk.pem
-    - euca.p12
-  - lineinfile: dest=/etc/eucaconsole/console.ini regexp='^host.*=' line="host = {{ ansible_host }}"
-  - lineinfile: dest=/etc/eucaconsole/nginx.conf regexp=proxy_pass.http line="proxy_pass http://{{ ansible_host }}:8888;"
-  - name: Start services
-    service: name={{ item }} state=restarted enabled=yes
-    with_items:
-    - eucalyptus-cloud
-    - eucaconsole
-  - wait_for: host={{ ansible_host }} port={{ item }}
-    with_items:
-    - 8888
-  - wait_for: host={{ ext }} port={{ item }}
-    with_items:
-    - 80
-    - 443
+  gather_facts: false
+  roles: [euca-ufs]
+  tags: ufs
 
 
 - hosts: cc:sc
+  gather_facts: false
   vars:
     sysctl_set:
       net.ipv4.ip_forward: 1
       net.bridge.bridge-nf-call-iptables: 1
-  tasks:
-  - sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
-    with_items: "{{ sysctl_set.keys() }}"
-  - name: Install cc/sc
-    yum: name={{ item }}
-    with_items:
-    - eucalyptus-sc
-    - eucalyptus-cc
-  - name: Convert azone to host list
-    set_fact: result="[]"
-  - set_fact: result="{{ result }} + {{ groups[item] }}"
-    with_items: "{{ azone.split(',') }}"
-  - name: Convert host list to IP list
-    set_fact: cc_nodes="[]"
-  - set_fact: cc_nodes="{{ cc_nodes }} + [ '{{ hostvars[item]['ansible_host'] }}' ]"
-    with_items: "{{ result }}"
-  - set_fact: cc_nodes="{{ cc_nodes | join(' ') }}"
-  - name: Configure eucalyptus.conf nodes
-    lineinfile: dest=/etc/eucalyptus/eucalyptus.conf regexp=^NODES line=NODES="{{ cc_nodes }}"
-    when: cc_nodes is defined
-  - copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
-    with_items:
-    - cloud-cert.pem
-    - cloud-pk.pem
-    - euca.p12
-  - copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
-    with_items:
-    - "{{ azone }}/cluster-cert.pem"
-    - "{{ azone }}/cluster-pk.pem"
-    - "{{ azone }}/node-cert.pem"
-    - "{{ azone }}/node-pk.pem"
-    ignore_errors: yes
-    when: azone is defined
-  - service: name={{ item }} state=restarted enabled=yes
-    with_items:
-    - eucalyptus-cloud
-    - eucalyptus-cc
-  - shell: clusteradmin-register-nodes {{ cc_nodes }}
-  - wait_for: port=8773 # sc
-  - wait_for: port=8774 # cc
-  # Ceph Client
-  - include: tasks/cephclient.yml
-  - shell: ip link add gw-host type veth peer name gw-mido
-    ignore_errors: yes
+  roles:
+  - euca-ccsc
+  - cephclient
+  tags: ccsc
+
 
 - hosts: nc
+  gather_facts: false
   vars:
     sysctl_set:
       net.ipv4.ip_forward: 1
       net.bridge.bridge-nf-call-iptables: 1
-  tasks:
-  - name: Set sysctl settings
-    sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
-    with_items: "{{ sysctl_set.keys() }}"
-  - name: Ensure hostname is resolvable
-    shell: ping -c1 $(hostname --fqdn)
-  - name: Install eucalyptus-nc
-    yum: name=eucalyptus-nc
-  - name: Load bridge module
-    modprobe: name=bridge
-  - shell: tuned-adm profile virtual-host
-  - copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
-    with_items:
-    - cloud-cert.pem
-    - "{{ azone }}/cluster-cert.pem"
-    - "{{ azone }}/cluster-pk.pem"
-    - "{{ azone }}/node-cert.pem"
-    - "{{ azone }}/node-pk.pem"
-    when: azone is defined
-  - service: name={{ item }} state=restarted enabled=yes
-    with_items:
-    - libvirtd
-    - messagebus
-  - service: name=eucalyptus-nc state=restarted enabled=yes
-    when: ansible_distribution_version < "7"
-  - service: name=eucalyptus-node state=restarted enabled=yes
-    when: ansible_distribution_version >= "7"
-  - name: Delete virtual network interface
-    shell: virsh net-destroy default; virsh net-autostart default --disable
-    ignore_errors: true
-  - wait_for: port=8775
-  # Ceph Client
-  - include: tasks/cephclient.yml
+  roles:
+  - euca-nc
+  - cephclient
+  tags: nc
+
+- hosts: clc
+  gather_facts: false
+  roles: [euca-register]
+  tags: register
 
 
 # midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e list tunnel-zone | grep 'name.mido-tz ' || \

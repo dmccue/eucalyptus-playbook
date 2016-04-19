@@ -1,0 +1,18 @@
+# UFS registration
+- shell: eval $(clcadmin-assume-system-credentials); euserv-describe-services --filter="service-type=user-api" --filter="host={{ hostvars[item]['ansible_host'] }}" | grep 'enabled *$' || euserv-register-service -t user-api -h "{{ hostvars[item]['ansible_host'] }}" "ufs-{{ hostvars[item]['ansible_host'] }}"
+  with_items: "{{ groups['ufs'] }}"
+
+# Cluster registration
+- shell: eval $(clcadmin-assume-system-credentials); euserv-describe-services --filter="service-type=cluster" --filter="host={{ hostvars[item]['ansible_host'] }}" | grep 'enabled *$' || euserv-register-service -t cluster -h "{{ hostvars[item]['ansible_host'] }}" -z "{{ hostvars[item]['azone'] }}" "cc-{{ hostvars[item]['ansible_host'] }}"
+  with_items: "{{ groups['cc'] }}"
+
+# SC registration
+- shell: eval $(clcadmin-assume-system-credentials); euserv-describe-services --filter="service-type=storage" --filter="host={{ hostvars[item]['ansible_host'] }}" | grep 'enabled *$' || euserv-register-service -t storage -h "{{ hostvars[item]['ansible_host'] }}" -z "{{ hostvars[item]['azone'] }}" "sc-{{ hostvars[item]['ansible_host'] }}"
+  with_items: "{{ groups['sc'] }}"
+
+# Object storage registration
+  # Walrusbackend not required
+
+# NC registration
+- shell: source ~/sysrc; euserv-describe-node-controllers | grep "{{ hostvars[item]['azone'] }} *{{ hostvars[item]['ansible_host'] }}"
+  with_items: "{{ groups['nc'] }}"
