@@ -2,17 +2,26 @@
 :INPUT ACCEPT [0:0]
 :FORWARD ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
--A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
--A INPUT -p icmp -j ACCEPT 
--A INPUT -i lo -j ACCEPT
--A INPUT -p tcp --dport 53 -j ACCEPT
--A INPUT -p udp --dport 53 -j ACCEPT
+
+{% if ext is defined %}
+# Allow external traffic
 -A INPUT -s 195.153.6.160/30 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
 -A INPUT -s 195.153.6.160/30 -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
 -A INPUT -s 195.153.6.160/30 -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT
 -A INPUT -s 195.153.6.160/30 -p tcp -m state --state NEW -m tcp --dport 8773 -j ACCEPT
+-A INPUT -p tcp --dport 53 -j ACCEPT
+-A INPUT -p udp --dport 53 -j ACCEPT
 -A INPUT -s 169.45.156.192/28 -j ACCEPT
+{% endif %}
+
+# Allow all internal subnet traffic
+-A INPUT -s 10.143.58.0/24 -p tcp -m state --state NEW,ESTABLISHED -m tcp --dport 22 -j ACCEPT
 -A INPUT -s 10.143.58.0/24 -j ACCEPT
+
+# Other
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p icmp -j ACCEPT
+-A INPUT -i lo -j ACCEPT
 -A INPUT -j REJECT --reject-with icmp-host-prohibited
 -A FORWARD -j REJECT --reject-with icmp-host-prohibited
 COMMIT

@@ -48,8 +48,6 @@
 - block:
   - name: Networking - External - load modules
     modprobe: name=bonding
-  - name: Networking - External - Create iptables firewall rules
-    copy: src=templates/iptables_ext dest=/etc/sysconfig/iptables
   - name: Networking - External - Copy sysconfig ifcfg files
     template: src=templates/network-scripts/ifcfg-bond.j2 dest=/etc/sysconfig/network-scripts/ifcfg-bond0
   - name: Networking - External - Set bonded slave interfaces
@@ -68,9 +66,8 @@
 # - name: Networking - Disable NetworkManager on all interfaces
 #   lineinfile: dest={{ item.path }} regexp=^NM_CONTROLLED line="NM_CONTROLLED=no"
 #   with_items: "{{ result.files }}"
-- name: Networking - Internal - Create internal iptables firewall rules
-  copy: src=templates/iptables_int dest=/etc/sysconfig/iptables
-  when: ext is not defined
+- name: Networking - Create iptables firewall rules
+  template: src=templates/iptables_rules.j2 dest=/etc/sysconfig/iptables
 - name: Reload firewall rules from file
   shell: iptables-restore < /etc/sysconfig/iptables
 - name: Restart iptables
