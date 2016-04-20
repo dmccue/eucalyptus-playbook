@@ -1,3 +1,6 @@
+- name: Set sysctl settings
+  sysctl: name="{{ item }}" value="{{ sysctl_set[item] }}"
+  with_items: "{{ sysctl_set.keys() }}"
 - name: Copy hosts file
   template: src=templates/hosts.j2 dest=/etc/hosts owner=root group=root mode=0644
 - name: Set hostname

@@ -13,6 +13,7 @@
 # Object storage registration
   # Walrusbackend not required
 
-# NC registration
-- shell: source ~/sysrc; euserv-describe-node-controllers | grep "{{ hostvars[item]['azone'] }} *{{ hostvars[item]['ansible_host'] }}"
+# NC registration - (no registration required as keys and NODES= has been set)
+- shell: source ~/sysrc; euserv-describe-node-controllers | grep "^NODE *{{ hostvars[item]['azone'] }} *{{ hostvars[item]['ansible_host'] }}"
   with_items: "{{ groups['nc'] }}"
+  ignore_errors: true
