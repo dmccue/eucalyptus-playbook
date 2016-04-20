@@ -10,7 +10,7 @@ EUCA_USER="eucalyptus"
 
 # Extra options to pass to the eucalyptus-cloud process, such as log
 # levels, heap size, or other JVM flags.
-CLOUD_OPTS="--bind-addr={{ ansible_host }} -Xmx32G -Xms32G -XX:ReservedCodeCacheSize=512M -XX:+MaxFDLimit -XX:+UseThreadPriorities -XX:+UseCompressedOops -XX:+UseStringCache -XX:+AggressiveOpts"
+CLOUD_OPTS="--bind-addr={{ ansible_host }} -Xms32G -Xmx{{ (ansible_memtotal_mb / 1000 / 100 * 70)|round|int }}G -XX:ReservedCodeCacheSize=512M -XX:+MaxFDLimit -XX:+UseThreadPriorities -XX:+UseCompressedOops -XX:+UseStringCache -XX:+AggressiveOpts"
 
 ###########################################################################
 # STORAGE CONTROLLER (SC) CONFIGURATION

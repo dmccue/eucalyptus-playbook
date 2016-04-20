@@ -12,18 +12,18 @@
 - wait_for: port=8773
 - synchronize: mode=pull src=/var/lib/eucalyptus/keys/* dest=templates/keys/ checksum=yes recursive=yes
   tags: always
-- action: shell clcadmin-assume-system-credentials > /root/sysrc && echo "export AWS_DEFAULT_REGION=localhost" >> /root/sysrc
+- action: shell clcadmin-assume-system-credentials > ~/sysrc && echo "export AWS_DEFAULT_REGION=localhost" >> ~/sysrc
   register: result
   until: result.rc == 0
   retries: 10
   delay: 5
-- action: shell source /root/sysrc && euserv-describe-services --filter="service-type=user-api" | grep 'enabled *$'
+- action: shell source ~/sysrc && euserv-describe-services --filter="service-type=user-api" | grep 'enabled *$'
   register: result
   until: result.rc == 0
-  retries: 10
+  retries: 20
   delay: 10
 - name: Set euctl properties
-  shell: source /root/sysrc; euctl "{{ item }}={{ euctl_set[item] }}"
+  shell: source ~/sysrc; euctl "{{ item }}={{ euctl_set[item] }}"
   with_items: "{{ euctl_set.keys() }}"
 # Post-installation
 - include: ../../../tasks/awscli.yml

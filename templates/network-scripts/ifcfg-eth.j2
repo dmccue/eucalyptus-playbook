@@ -6,19 +6,21 @@ USERCTL=no
 NM_CONTROLLED=no
 MTU=1500
 {% if 'nc' in group_names %}
-{# Note: Point eth device to bridge on nc hosts #}
+  {#- Note: Point eth device to bridge on nc hosts #}
 DEVICE=eth0
 BRIDGE=br0
 {% elif item is defined and ext is defined and ext_bond_slaves is defined %}
-{# Note: Point eth device to bonded interface #}
+  {#- Note: If not NC and external interface, Point eth device to bonded interface #}
 DEVICE={{ item }}
 MASTER=bond0
 SLAVE=yes
 {% else %}
-{# Note: Regular eth device #}
+  {#- Note: Regular eth device #}
 DEVICE=eth0
 IPADDR={{ ansible_host }}
-NETMASK=255.255.255.0
-{# Note: Removes gateway from internal interfaces if there's an external interface #}
-{% if ext is not defined %}GATEWAY=10.143.58.175{% endif %}
+PREFIX=24
+  {#- Note: Removes gateway from internal interfaces if there's an external interface #}
+{% if ext is not defined -%}
+GATEWAY=10.143.58.175
+{%- endif %}
 {% endif %}

@@ -3,6 +3,7 @@
   gather_facts: false
   tasks:
   - file: name=~/.ssh/mux-* state=absent
+  - pip: name=ansible version=2.0.2.0
 
 
 - hosts: clc:cc:sc:ufs:nc

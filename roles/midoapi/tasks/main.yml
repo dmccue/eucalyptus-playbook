@@ -32,6 +32,6 @@
   # - shell: "{{ midonet_cmd }} list tunnel-zone name {{ mido_tunnelzone_name }} member"
   # Add members
   - shell: "HOSTID=$({{ midonet_cmd }} list host name {{ item }} | cut -d' ' -f2); {{ midonet_cmd }} list tunnel-zone name {{ mido_tunnelzone_name }} member host $HOSTID | grep $HOSTID || {{ midonet_cmd }} tunnel-zone {{ mido_tunnelzone_id }} add member host $HOSTID address {{ hostvars[item]['ansible_host'] }}"
-    with_items: "{{ groups['midolman'] }}"
+    with_items: "{{ groups['cc'] + groups['nc'] }}"
     ignore_errors: true
   when: euca_network_mode == "VPCMIDO"

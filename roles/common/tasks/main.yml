@@ -1,5 +1,5 @@
 - name: Copy hosts file
-  copy: src=templates/hosts_file dest=/etc/hosts owner=root group=root mode=0644
+  template: src=templates/hosts.j2 dest=/etc/hosts owner=root group=root mode=0644
 - name: Set hostname
   hostname: name={{ inventory_hostname }}
 - name: Install packages
@@ -22,7 +22,7 @@
   when: repo_added|changed
 - name: Set selinux to permissive
   selinux: policy=targeted state=permissive
-- name: Start ntp
+- name: Restart ntp
   service: name=ntpd state=restarted enabled=yes pattern='/ntpd'
 - name: Create eucalyptus directory
   file: path=/etc/eucalytpus state=directory
@@ -49,12 +49,10 @@
   - name: Networking - External - load modules
     modprobe: name=bonding
   - name: Networking - External - Copy sysconfig ifcfg files
-    template: src=templates/network-scripts/ifcfg-bond.j2 dest=/etc/sysconfig/network-scripts/ifcfg-bond0
+    template: src=templates/network-scripts/ifcfg-bond.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ ext_bond_device }}
   - name: Networking - External - Set bonded slave interfaces
     template: src=templates/network-scripts/ifcfg-eth.j2 dest=/etc/sysconfig/network-scripts/ifcfg-{{ item }}
     with_items: "{{ ext_bond_slaves }}"
-  # - name: Networking - External - Remove internal gateway if ext - eth0
-  #   lineinfile: dest=/etc/sysconfig/network-scripts/ifcfg-eth0 regexp=^GATEWAY line=""
   when: ext is defined
 
 ###########################

@@ -8,6 +8,8 @@
 - name: Load bridge module
   modprobe: name=bridge
 - shell: tuned-adm profile virtual-host
+- set_fact: azone=""
+  when: azone is not defined
 - copy: src=templates/keys/{{ item }} dest=/var/lib/eucalyptus/keys/
   with_items:
   - cloud-cert.pem
@@ -15,7 +17,7 @@
   - "{{ azone }}/cluster-pk.pem"
   - "{{ azone }}/node-cert.pem"
   - "{{ azone }}/node-pk.pem"
-  when: azone is defined
+  when: azone
 - service: name={{ item }} state=restarted enabled=yes
   with_items:
   - libvirtd
