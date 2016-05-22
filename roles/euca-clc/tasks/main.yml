@@ -7,9 +7,17 @@
   when: not result.stat.exists
 - shell: clcadmin-initialize-cloud
   when: not result.stat.exists
+- service: name=eucalyptus-cloud state=stopped enabled=yes
+# Backup
+- file: path=~/euca_db_backup state=directory
+- shell: pg_dumpall -c -o -h /var/lib/eucalyptus/db/data -U root -p 8777 | gzip > ~/euca_db_backup/eucalyptus-database-$(date +%Y%m%d-%H%M%S).sql.gz
+- shell: tar -czvf ~/euca_db_backup/eucalyptus-keysdir-$(date +%Y%m%d-%H%M%S).tgz /var/lib/eucalyptus/keys
+- shell: tar -czvf ~/euca_db_backup/eucalyptus-etcdir-$(date +%Y%m%d-%H%M%S).tgz /etc/eucalyptus
+# Start
 - service: name=eucalyptus-cloud state=restarted enabled=yes
-- wait_for: port=8443
-- wait_for: port=8773
+- wait_for: port=8443 #eucalyptus-cloud
+- wait_for: port=8773 #eucalyptus-cloud
+- wait_for: port=8777 #postgres
 - synchronize: mode=pull src=/var/lib/eucalyptus/keys/* dest=templates/keys/ checksum=yes recursive=yes
   tags: always
 - action: shell clcadmin-assume-system-credentials > ~/sysrc && echo "export AWS_DEFAULT_REGION=localhost" >> ~/sysrc

@@ -14,7 +14,15 @@
     - tomcat
     - eucanetd
   - wait_for: port=8080
+  
   # Mido-api create resources
+  # Set cassandra servers
+  - set_fact: cassandra_seeds="{{ hostvars[item]['ansible_host'] }}"
+    with_items: "{{ groups['nsd'] }}"
+    register: result
+  - set_fact: cassandra_seeds="{{ result.results | map(attribute='ansible_facts.cassandra_seeds') | list | join(",") }}"
+  - shell: echo 'cassandra.servers : "{{ cassandra_seeds }}"' | mn-conf set -t default
+    ignore_errors: true
   # Create variables
   - set_fact: midonet_cmd="midonet-cli -A --midonet-url=http://127.0.0.1:8080/midonet-api -e"
   - set_fact: mido_tunnelzone_name=mido-tz
